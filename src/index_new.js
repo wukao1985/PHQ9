@@ -160,6 +160,7 @@ function getWelcomeResponse(callback) {
 
 function handleAnswerRequest(intent, session, callback) {
     var speechOutput = "";
+	var repromptText = "";
     var sessionAttributes = {};
     var sessionInProgress = session.attributes && session.attributes.questions;
 	var answerSlotValid = isAnswerSlotValid(intent);
@@ -190,6 +191,8 @@ function handleAnswerRequest(intent, session, callback) {
 			    questionIndexForSpeech = currentQuestionIndex + 1;
 
 			speechOutput += "Question " + questionIndexForSpeech.toString() + ". "
+                			+ spokenQuestion + " ";
+			repromptText = "Question " + questionIndexForSpeech.toString() + ". "
                 			+ spokenQuestion + " ";
 			sessionAttributes = {
                 "speechOutput": repromptText,
@@ -229,8 +232,8 @@ function handleGetHelpRequest(intent, session, callback) {
             the last two weeks. There are four choises: not at all, several days, more than half \
             the days and nearly every day.	Try to choose the most close answer based on your \
 			situation.",
-        repromptText = "Would you like to start the assessment?";
-        var shouldEndSession = false;
+        repromptText = "Would you like to start the assessment?",
+        shouldEndSession = false;
     callback(session.attributes,
         buildSpeechletResponseWithoutCard(speechOutput, repromptText, shouldEndSession));
 }
