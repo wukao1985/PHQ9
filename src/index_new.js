@@ -110,8 +110,6 @@ function onIntent(intentRequest, session, callback) {
         handleAnswerRequest(intent, session, callback);
     } else if ("AnswerOnlyIntent" === intentName) {
         handleAnswerRequest(intent, session, callback);
-    } else if ("DontKnowIntent" === intentName) {
-        handleAnswerRequest(intent, session, callback);
     } else if ("AMAZON.YesIntent" === intentName) {
         handleAnswerRequest(intent, session, callback);
     } else if ("AMAZON.NoIntent" === intentName) {
@@ -132,6 +130,9 @@ function onIntent(intentRequest, session, callback) {
 }
 
 // ---------- Skill specific Logic ------------------
+var ANSWER_COUNT = 4;
+var CARD_TITLE = "Trivia"; // Be sure to change this for your skill.
+
 function getWelcomeResponse(callback) {
     var sessionAttributes = {},
         speechOutput = "I will lsit " + questions.length.toString()
@@ -143,7 +144,7 @@ function getWelcomeResponse(callback) {
 		
 		currentQuestionIndex = 0,
 		spokenQuestion = questions[currentQuestionIndex],
-		repromtText = "Question 1. " + spokenQuestion + " ",
+		repromptText = "Question 1. " + spokenQuestion + " ";
 		
 		speechOutput += repromptText;
 		sessionAttributes = {
@@ -161,17 +162,58 @@ function handleAnswerRequest(intent, session, callback) {
     var speechOutput = "";
     var sessionAttributes = {};
     var sessionInProgress = session.attributes && session.attributes.questions;
+	var answerSlotValid = isAnswerSlotValid(intent);
 
-    if (!gameInProgress) {
+    if (!sessionInProgress) {
         // If the user responded with an answer but there is no game in progress, ask the user
         // if they want to start a new game. Set a flag to track that we've prompted the user.
         sessionAttributes.userPromptedToContinue = true;
         speechOutput = "There is no session in progress. Do you want to start a new session? ";
         callback(sessionAttributes,
             buildSpeechletResponse(CARD_TITLE, speechOutput, speechOutput, false));
-	} else { 
-	    
+	} else {
+        var sessionQuestions = session.attributes.questions,
+            currentScore = parseInt(session.attributes.score),
+            currentQuestionIndex = parseInt(session.attributes.currentQuestionIndex);
+        if (answerSlotValid) {
+			currentScore += parseInt(intent.slots.Answer.value);
+		}
+		if (currentQuestionIndex == session.attributes.questions.length - 1) {
+			// add specific diagnose afterwoods
+			speechOutput = "Your final score is " + currentScore.toString() + "Thank you \
+			               for taking Patient Health Questionnaire. Take care!"; 
+            callback(session.attributes,
+                buildSpeechletResponse(CARD_TITLE, speechOutput, "", true));
+		} else {
+			currentQuestionIndex += 1;
+			var spokenQuestion = session.attributes.questions[currentQuestionIndex],
+			    questionIndexForSpeech = currentQuestionIndex + 1;
+
+			speechOutput += "Question " + questionIndexForSpeech.toString() + ". "
+                			+ spokenQuestion + " ";
+			sessionAttributes = {
+                "speechOutput": repromptText,
+                "repromptText": repromptText,
+                "currentQuestionIndex": currentQuestionIndex,
+                "questions": sessionQuestions,
+                "score": currentScore,
+            };
+            callback(sessionAttributes,
+                buildSpeechletResponse(CARD_TITLE, speechOutput, repromptText, false));
+		}
 	}
+}
+
+function handleRepeatRequest(intent, session, callback) {
+    // Repeat the previous speechOutput and repromptText from the session attributes if available
+    // else start a new game session
+    if (!session.attributes || !session.attributes.speechOutput) {
+        getWelcomeResponse(callback);
+    } else {
+        callback(session.attributes,
+            buildSpeechletResponseWithoutCard(session.attributes.speechOutput, session.attributes.repromptText, false));
+    }
+}
 
 function handleGetHelpRequest(intent, session, callback) {
     // Provide a help prompt for the user, explaining how the game is played. Then, continue the game
@@ -197,6 +239,12 @@ function handleFinishSessionRequest(intent, session, callback) {
     // End the session with a "Good bye!" if the user wants to quit the game
     callback(session.attributes,
         buildSpeechletResponseWithoutCard("Thank you for taking the assessment. Good bye!", "", true));
+}
+
+function isAnswerSlotValid(intent) {
+    var answerSlotFilled = intent.slots && intent.slots.Answer && intent.slots.Answer.value;
+    var answerSlotIsInt = answerSlotFilled && !isNaN(parseInt(intent.slots.Answer.value));
+    return answerSlotIsInt && parseInt(intent.slots.Answer.value) < (ANSWER_COUNT + 1) && parseInt(intent.slots.Answer.value) > 0;
 }
 
 // ------- Helper functions to build responses -------
