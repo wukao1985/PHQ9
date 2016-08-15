@@ -21,8 +21,18 @@ var questions = [
 	 some way."
 ]
 
-var default_answers = "A, Not at all.  B, several days. C, more than   \
-                       half the days or D, nearly every day"
+var diagnoses = [
+    "Congratulations! It seems like you don't have any depression sympotom. Keep it up. ",
+    "You have minimal depression symptoms. I recommand that you find some support and return to the \
+        assessment in one month. ",
+    "You have mild level depression. It's recommanded that you seek support and continuesely monitor \
+        your situation. ",
+    "You have major depression, and antidepressant or psychotherapy is recommanded. ",
+    "You have severe depression, please seek ntidepressant or psychotherapy immediately for your health. "
+]
+
+var default_answers = " " + " One, Not at all.  Two, several days. Three, more than   \
+                       half the days. Four, nearly every day."
 					   
 
 // Route the incoming request based on type (LaunchRequest, IntentRequest,
@@ -36,9 +46,9 @@ exports.handler = function (event, context) {
          * prevent someone else from configuring a skill that sends requests to this function.
          */
 
-//     if (event.session.application.applicationId !== "amzn1.echo-sdk-ams.app.05aecccb3-1461-48fb-a008-822ddrt6b516") {
-//         context.fail("Invalid Application ID");
-//      }
+        //if (event.session.application.applicationId !== "amzn1.ask.skill.ebf6d09b-5cfa-4072-bc67-851339188ba0") {
+         //  context.fail("Invalid Application ID");
+        //}
 
         if (event.session.new) {
             onSessionStarted({requestId: event.request.requestId}, event.session);
@@ -129,22 +139,34 @@ function onIntent(intentRequest, session, callback) {
     }
 }
 
+/**
+ * Called when the user ends the session.
+ * Is not called when the skill returns shouldEndSession=true.
+ */
+function onSessionEnded(sessionEndedRequest, session) {
+    console.log("onSessionEnded requestId=" + sessionEndedRequest.requestId
+                + ", sessionId=" + session.sessionId);
+    
+    // Add any cleanup logic here
+}
+
 // ---------- Skill specific Logic ------------------
 var ANSWER_COUNT = 4;
 var CARD_TITLE = "Trivia"; // Be sure to change this for your skill.
 
 function getWelcomeResponse(callback) {
     var sessionAttributes = {},
-        speechOutput = "I will lsit " + questions.length.toString()
+        speechOutput = "Hi, this is patient health questinnaire from Better me. "
+        speechOutput += "During the assessment, I will lsit " + questions.length.toString()
             + " problems, try to recall how many times you encoutered these problems during \
             the last two weeks. There are four choises: not at all, several days, more than half \
-            the days and nearly every day.	Try to choose the most close answer based on your \
-			situation. Let's begin.",
-        shouldEndSession = false,
+            the days , nearly every day.	Try to choose the most close answer based on your \
+			situation. Let's begin. ";
+     var shouldEndSession = false,
 		
 		currentQuestionIndex = 0,
 		spokenQuestion = questions[currentQuestionIndex],
-		repromptText = "Question 1. " + spokenQuestion + " ";
+		repromptText = "Question 1. " + spokenQuestion + ". " + default_answers + " ";
 		
 		speechOutput += repromptText;
 		sessionAttributes = {
@@ -177,12 +199,24 @@ function handleAnswerRequest(intent, session, callback) {
             currentScore = parseInt(session.attributes.score),
             currentQuestionIndex = parseInt(session.attributes.currentQuestionIndex);
         if (answerSlotValid) {
-			currentScore += parseInt(intent.slots.Answer.value);
+			currentScore += parseInt(intent.slots.Answer.value) - 1;
 		}
 		if (currentQuestionIndex == session.attributes.questions.length - 1) {
 			// add specific diagnose afterwoods
-			speechOutput = "Your final score is " + currentScore.toString() + "Thank you \
-			               for taking Patient Health Questionnaire. Take care!"; 
+			speechOutput = "Your final score is " + currentScore.toString() + " ";
+            if (currentScore < 5) {
+                speechOutput += diagnoses[0];
+            } else if (currentScore < 10) {
+                speechOutput += diagnoses[1];
+            } else if (currentScore < 15) {
+                speechOutput += diagnoses[2];
+            } else if (currentScore < 20) {
+                speechOutput += diagnoses[3];
+            } else {
+                speechOutput += diagnoses[4];
+            }
+            
+            speechOutput += "Thank you for taking Patient Health Questionnaire. Take care!";
             callback(session.attributes,
                 buildSpeechletResponse(CARD_TITLE, speechOutput, "", true));
 		} else {
@@ -191,9 +225,9 @@ function handleAnswerRequest(intent, session, callback) {
 			    questionIndexForSpeech = currentQuestionIndex + 1;
 
 			speechOutput += "Question " + questionIndexForSpeech.toString() + ". "
-                			+ spokenQuestion + " ";
+                			+ spokenQuestion + ". " + default_answers + " ";
 			repromptText = "Question " + questionIndexForSpeech.toString() + ". "
-                			+ spokenQuestion + " ";
+                			+ spokenQuestion + ". " + default_answers + " ";
 			sessionAttributes = {
                 "speechOutput": repromptText,
                 "repromptText": repromptText,
@@ -241,7 +275,7 @@ function handleGetHelpRequest(intent, session, callback) {
 function handleFinishSessionRequest(intent, session, callback) {
     // End the session with a "Good bye!" if the user wants to quit the game
     callback(session.attributes,
-        buildSpeechletResponseWithoutCard("Thank you for taking the assessment. Good bye!", "", true));
+        buildSpeechletResponseWithoutCard("Thank you for taking the assessment. Good bye!" + " ", "", true));
 }
 
 function isAnswerSlotValid(intent) {
@@ -295,4 +329,3 @@ function buildSpeechletResponseWithoutCard(output, repromptText, shouldEndSessio
         response: speechletResponse
     };
 }
-      
